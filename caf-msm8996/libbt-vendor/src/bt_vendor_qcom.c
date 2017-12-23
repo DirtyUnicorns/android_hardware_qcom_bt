@@ -319,6 +319,18 @@ void stop_hci_filter() {
                    usleep(STOP_WAIT_TIMEOUT);
                }
            }
+
+           /*Never use SIGKILL to stop the filter*/
+           /* Filter will be stopped by below two conditions
+            - by Itself, When it realizes there are no CONNECTED clients
+            - Or through STOP_WCNSS_FILTER byte on Control socket
+            both of these ensure clean shutdown of chip
+           */
+           //property_set(BT_VND_FILTER_START, "false");
+       } else if (soc_type == BT_SOC_ROME) {
+           property_set(BT_VND_FILTER_START, "false");
+       } else {
+           ALOGI("%s: Unknown soc type %d, Unexpected!", __func__, soc_type);
        }
 
        ALOGV("%s: Exit ", __func__);
