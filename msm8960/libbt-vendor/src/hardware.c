@@ -24,7 +24,7 @@
  *
  ******************************************************************************/
 
-#define LOG_TAG "bt_hwcfg"
+#define LOG_TAG "bt_vendor"
 
 #include <utils/Log.h>
 #include <sys/types.h>
@@ -41,25 +41,40 @@
 #include "bt_types.h"
 #include "bt_hci_bdroid.h"
 #include "bt_vendor_qcom.h"
-
+#include <string.h>
 #define MAX_CNT_RETRY 100
 
 int hw_config(int nState)
 {
-    ALOGI("Starting hciattach daemon");
     char *szState[] = {"true", "false"};
     char *szReqSt = NULL;
+    char szBtSocStatus[PROPERTY_VALUE_MAX] = {'\0', };
 
     if(nState == BT_VND_PWR_OFF)
         szReqSt = szState[1];
     else
         szReqSt = szState[0];
 
-    ALOGI("try to set %s", szReqSt);
-
-    if (property_set("bluetooth.hciattach", szReqSt) < 0){
-        ALOGE("Property Setting fail");
-	return -1;
+    if((property_get("bluetooth.status", szBtSocStatus, "") <= 0))
+    {
+       if(nState == BT_VND_PWR_ON ) {
+          ALOGW("Hw_config: First Time BT on after boot.Starting hciattach daemon BTStatus=%s",szBtSocStatus);
+          if (property_set("bluetooth.hciattach", szReqSt) < 0)
+          {
+              ALOGE("Hw_config: Property Setting fail");
+              return -1;
+          }
+       }
+    } else if( !(strncmp(szBtSocStatus, "on", strlen("on")))) {
+          //BTSOC is already on
+          ALOGW("Hw_config: nState = %d", nState);
+    } else {
+          ALOGW("Hw_config: trigerring hciattach");
+          if (property_set("bluetooth.hciattach", szReqSt) < 0)
+          {
+              ALOGE("Hw_config: Property Setting fail");
+              return -1;
+          }
     }
 
     return 0;
@@ -69,12 +84,12 @@ int readTrpState()
 {
     char szBtStatus[PROPERTY_VALUE_MAX] = {0, };
     if(property_get("bluetooth.status", szBtStatus, "") < 0){
-        ALOGE("Fail to get bluetooth satus");
+        ALOGE("Fail to get bluetooth status");
         return FALSE;
     }
 
     if(!strncmp(szBtStatus, "on", strlen("on"))){
-        ALOGI("bluetooth satus is on");
+        ALOGI("bluetooth status is on");
         return TRUE;
     }
     return FALSE;
@@ -86,13 +101,12 @@ int is_hw_ready()
     char szStatus[10] = {0,};
 
     for(i=MAX_CNT_RETRY; i>0; i--){
-       usleep(50*1000);
        //TODO :: checking routine
        if(readTrpState()==TRUE){
            break;
        }
+       usleep(50*1000);
     }
-
     return (i==0)? FALSE:TRUE;
 }
 
@@ -120,26 +134,31 @@ void hw_epilog_cback(void *p_mem)
 
     ALOGI("%s Opcode:0x%04X Status: %d", __FUNCTION__, opcode, status);
 
-    if (bt_vendor_cbacks)
-    {
-        /* Must free the RX event buffer */
-        bt_vendor_cbacks->dealloc(p_evt_buf);
-
-        /* Once epilog process is done, must call callback to notify caller */
-        bt_vendor_cbacks->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
+    pthread_mutex_lock(&q_lock);
+    if (!q) {
+        ALOGE("hw_epilog_cback called with NULL context");
+        goto out;
     }
+    /* Must free the RX event buffer */
+    q->cb->dealloc(p_evt_buf);
+
+    /* Once epilog process is done, must call callback to notify caller */
+    q->cb->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
+out:
+    pthread_mutex_unlock(&q_lock);
 }
 
 /*******************************************************************************
 **
 ** Function         hw_epilog_process
 **
-** Description      Sample implementation of epilog process
+** Description      Sample implementation of epilog process. This process is
+**                  called with q_lock held and q->cb is assumed to be valid.
 **
 ** Returns          None
 **
 *******************************************************************************/
-void hw_epilog_process(void)
+void __hw_epilog_process(void)
 {
     HC_BT_HDR  *p_buf = NULL;
     uint8_t     *p;
@@ -147,13 +166,8 @@ void hw_epilog_process(void)
     ALOGI("hw_epilog_process");
 
     /* Sending a HCI_RESET */
-    if (bt_vendor_cbacks)
-    {
-        /* Must allocate command buffer via HC's alloc API */
-        p_buf = (HC_BT_HDR *) bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + \
-                                                       HCI_CMD_PREAMBLE_SIZE);
-    }
-
+    /* Must allocate command buffer via HC's alloc API */
+    p_buf = (HC_BT_HDR *) q->cb->alloc(BT_HC_HDR_SIZE + HCI_CMD_PREAMBLE_SIZE);
     if (p_buf)
     {
         p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
@@ -166,17 +180,12 @@ void hw_epilog_process(void)
         *p = 0; /* parameter length */
 
         /* Send command via HC's xmit_cb API */
-        bt_vendor_cbacks->xmit_cb(HCI_RESET, p_buf, hw_epilog_cback);
+        q->cb->xmit_cb(HCI_RESET, p_buf, hw_epilog_cback);
     }
     else
     {
-        if (bt_vendor_cbacks)
-        {
-            ALOGE("vendor lib epilog process aborted [no buffer]");
-            bt_vendor_cbacks->epilog_cb(BT_VND_OP_RESULT_FAIL);
-        }
+        ALOGE("vendor lib epilog process aborted [no buffer]");
+        q->cb->epilog_cb(BT_VND_OP_RESULT_FAIL);
     }
 }
 #endif // (HW_NEED_END_WITH_HCI_RESET == TRUE)
-
-

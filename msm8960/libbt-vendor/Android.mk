@@ -16,7 +16,7 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifneq ($(BOARD_HAVE_BLUETOOTH_QCOM),)
+ifeq ($(BOARD_HAVE_BLUETOOTH_QCOM),true)
 
 include $(CLEAR_VARS)
 
@@ -25,7 +25,19 @@ BDROID_DIR:= system/bt
 LOCAL_SRC_FILES := \
         src/bt_vendor_qcom.c \
         src/hardware.c \
-        src/userial_vendor.c
+        src/hci_uart.c \
+        src/hci_smd.c \
+        src/hw_rome.c \
+        src/hw_ar3k.c \
+        src/bt_vendor_persist.cpp
+
+#Disable this flag in case if FM over UART support not needed
+LOCAL_CFLAGS := -DFM_OVER_UART
+
+ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+LOCAL_CFLAGS += -DPANIC_ON_SOC_CRASH
+LOCAL_CFLAGS += -DENABLE_DBG_FLAGS
+endif
 
 LOCAL_C_INCLUDES += \
         $(LOCAL_PATH)/include \
@@ -34,7 +46,8 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_SHARED_LIBRARIES := \
         libcutils \
-        liblog
+        liblog \
+        libbtnv
 
 LOCAL_MODULE := libbt-vendor
 LOCAL_MODULE_TAGS := optional
@@ -42,7 +55,7 @@ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 LOCAL_MODULE_OWNER := qcom
 LOCAL_PROPRIETARY_MODULE := true
 
-include $(LOCAL_PATH)/vnd_buildcfg.mk
+#include $(LOCAL_PATH)/vnd_buildcfg.mk
 
 include $(BUILD_SHARED_LIBRARY)
 
