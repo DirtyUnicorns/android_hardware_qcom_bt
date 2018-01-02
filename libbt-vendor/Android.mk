@@ -68,6 +68,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_HEADER_LIBRARIES := \
         libutils_headers
 
+LOCAL_CFLAGS += -Wno-error
 LOCAL_MODULE := libbt-vendor
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
