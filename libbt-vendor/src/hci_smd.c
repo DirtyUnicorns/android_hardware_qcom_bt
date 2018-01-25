@@ -35,7 +35,7 @@
 #include <unistd.h>
 
 #include <cutils/properties.h>
-#include <utils/Log.h>
+#include <log/log.h>
 
 /*****************************************************************************
 **   Macros & Constants

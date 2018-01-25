@@ -43,7 +43,7 @@
 
 #include <cutils/properties.h>
 #include <cutils/sockets.h>
-#include <utils/Log.h>
+#include <log/log.h>
 #define WAIT_TIMEOUT 200000
 #define BT_VND_OP_GET_LINESPEED 30
 

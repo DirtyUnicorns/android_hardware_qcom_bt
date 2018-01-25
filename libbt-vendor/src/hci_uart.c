@@ -37,7 +37,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <utils/Log.h>
+#include <log/log.h>
 
 /******************************************************************************
 **  Constants & Macros

@@ -41,7 +41,7 @@
 #include <unistd.h>
 
 #include <cutils/properties.h>
-#include <utils/Log.h>
+#include <log/log.h>
 #define MAX_CNT_RETRY 100
 
 int hw_config(int nState)

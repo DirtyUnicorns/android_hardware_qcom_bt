@@ -55,7 +55,7 @@ extern "C" {
 #include <unistd.h>
 
 #include <cutils/properties.h>
-#include <utils/Log.h>
+#include <log/log.h>
 
 /******************************************************************************
 **  Variables
